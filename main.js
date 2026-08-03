@@ -1,6 +1,3 @@
-import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
-import { Hands, HAND_CONNECTIONS } from '@mediapipe/hands';
-
 const videoElement = document.getElementById('videoElement');
 const canvasElement = document.getElementById('canvasElement');
 const canvasCtx = canvasElement.getContext('2d');
@@ -18,11 +15,11 @@ function onResults(results) {
   
   if (results.multiHandLandmarks) {
     for (const landmarks of results.multiHandLandmarks) {
-      drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {
+      window.drawConnectors(canvasCtx, landmarks, window.HAND_CONNECTIONS, {
         color: '#00FF00',
         lineWidth: 4
       });
-      drawLandmarks(canvasCtx, landmarks, {
+      window.drawLandmarks(canvasCtx, landmarks, {
         color: '#FF0000',
         lineWidth: 2,
         radius: 3
@@ -32,7 +29,7 @@ function onResults(results) {
   canvasCtx.restore();
 }
 
-const hands = new Hands({
+const hands = new window.Hands({
   locateFile: (file) => {
     return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
   }
