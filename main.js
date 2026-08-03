@@ -5,40 +5,17 @@ const statusOverlay = document.getElementById('statusOverlay');
 const statusText = document.getElementById('statusText');
 const startButton = document.getElementById('startButton');
 const spinner = document.querySelector('.spinner');
-const toggleSkeleton = document.getElementById('toggleSkeleton');
-const toggleEffect = document.getElementById('toggleEffect');
 
-let showSkeleton = false;
-let showEffect = true;
-
-toggleSkeleton.textContent = 'Kerangka: OFF';
-toggleSkeleton.classList.remove('active');
-
-toggleSkeleton.addEventListener('click', () => {
-  showSkeleton = !showSkeleton;
-  toggleSkeleton.textContent = `Kerangka: ${showSkeleton ? 'ON' : 'OFF'}`;
-  toggleSkeleton.classList.toggle('active', showSkeleton);
-});
-
-toggleEffect.addEventListener('click', () => {
-  showEffect = !showEffect;
-  toggleEffect.textContent = `Efek Visual: ${showEffect ? 'ON' : 'OFF'}`;
-  toggleEffect.classList.toggle('active', showEffect);
-});
+let shockwaves = [];
+let handStates = {};
 
 function resizeCanvas() {
   canvasElement.width = videoElement.videoWidth || 640;
   canvasElement.height = videoElement.videoHeight || 480;
 }
 
-function drawGlowSphere(ctx, x, y, radius, color, glowColor) {
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, 2 * Math.PI);
-  ctx.fillStyle = color;
-  ctx.shadowColor = glowColor;
-  ctx.shadowBlur = radius * 2;
-  ctx.fill();
-  ctx.shadowBlur = 0;
+function getDistance(p1, p2, w, h) {
+  return Math.hypot((p1.x - p2.x) * w, (p1.y - p2.y) * h);
 }
 
 function onResults(results) {
@@ -49,111 +26,151 @@ function onResults(results) {
   
   canvasCtx.save();
   canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+  canvasCtx.globalCompositeOperation = 'screen';
+  
+  const time = performance.now() * 0.001;
+  const w = canvasElement.width;
+  const h = canvasElement.height;
+  
+  for (let i = shockwaves.length - 1; i >= 0; i--) {
+    const sw = shockwaves[i];
+    sw.radius += 25;
+    sw.alpha -= 0.03;
+    if (sw.alpha <= 0) {
+      shockwaves.splice(i, 1);
+    } else {
+      canvasCtx.beginPath();
+      canvasCtx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+      canvasCtx.strokeStyle = `rgba(0, 255, 255, ${sw.alpha})`;
+      canvasCtx.lineWidth = 15 * sw.alpha;
+      canvasCtx.stroke();
+    }
+  }
   
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-    if (showEffect && results.multiHandLandmarks.length === 2) {
-      canvasCtx.globalCompositeOperation = 'screen';
+    results.multiHandLandmarks.forEach((landmarks, index) => {
+      const base = landmarks[0];
+      const midMCP = landmarks[9];
+      const thumbTip = landmarks[4];
+      const indexTip = landmarks[8];
+      const middleTip = landmarks[12];
+      const ringTip = landmarks[16];
+      const pinkyTip = landmarks[20];
       
-      const tip1 = results.multiHandLandmarks[0][8];
-      const tip2 = results.multiHandLandmarks[1][8];
+      const palmX = midMCP.x * w;
+      const palmY = midMCP.y * h;
       
-      const xA = tip1.x * canvasElement.width;
-      const yA = tip1.y * canvasElement.height;
-      const xB = tip2.x * canvasElement.width;
-      const yB = tip2.y * canvasElement.height;
+      const dIndexBase = getDistance(indexTip, base, w, h);
+      const dThumbPinky = getDistance(thumbTip, pinkyTip, w, h);
+      const dMidBase = getDistance(middleTip, base, w, h);
       
-      const leftX = xA < xB ? xA : xB;
-      const leftY = xA < xB ? yA : yB;
-      const rightX = xA < xB ? xB : xA;
-      const rightY = xA < xB ? yB : yA;
+      let mode = 'standby';
+      let pColor = 'rgba(0, 255, 255,';
+      let sColor = 'rgba(0, 150, 255,';
+      let rSpeed = 1;
       
-      const dist = Math.hypot(rightX - leftX, rightY - leftY);
+      if (dIndexBase < 100 && dMidBase < 100) {
+        mode = 'fist';
+      } else if (dIndexBase > 200 && dThumbPinky > 200) {
+        mode = 'charging';
+        pColor = 'rgba(255, 60, 0,';
+        sColor = 'rgba(255, 120, 0,';
+        rSpeed = 6;
+      }
       
-      if (dist < 250) {
-        const midX = (leftX + rightX) / 2;
-        const midY = (leftY + rightY) / 2;
-        const intensity = Math.max(0, 250 - dist) / 250;
-        
-        drawGlowSphere(canvasCtx, leftX, leftY, 20 + (intensity * 10), 'rgba(255, 100, 100, 0.8)', 'red');
-        drawGlowSphere(canvasCtx, rightX, rightY, 20 + (intensity * 10), 'rgba(100, 150, 255, 0.8)', 'blue');
-        
-        const purpleRadius = 30 + (intensity * 120);
-        const gradient = canvasCtx.createRadialGradient(midX, midY, purpleRadius * 0.1, midX, midY, purpleRadius);
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-        gradient.addColorStop(0.2, 'rgba(200, 100, 255, 0.9)');
-        gradient.addColorStop(0.6, 'rgba(138, 43, 226, 0.5)');
-        gradient.addColorStop(1, 'rgba(138, 43, 226, 0)');
+      const handId = `hand_${index}`;
+      if (!handStates[handId]) handStates[handId] = 'standby';
+      
+      if (mode === 'fist' && handStates[handId] !== 'fist') {
+        shockwaves.push({ x: palmX, y: palmY, radius: 20, alpha: 1 });
+      }
+      handStates[handId] = mode;
+      
+      if (mode === 'fist') return;
+      
+      const angle = Math.atan2(midMCP.y - base.y, midMCP.x - base.x) + Math.PI / 2;
+      
+      canvasCtx.save();
+      canvasCtx.translate(palmX, palmY);
+      canvasCtx.rotate(angle);
+      
+      canvasCtx.shadowColor = `${pColor} 1)`;
+      canvasCtx.shadowBlur = mode === 'charging' ? 50 : 20;
+      canvasCtx.fillStyle = `${pColor} 0.95)`;
+      canvasCtx.beginPath();
+      canvasCtx.arc(0, 0, mode === 'charging' ? 30 : 18, 0, Math.PI * 2);
+      canvasCtx.fill();
+      
+      canvasCtx.lineWidth = 2;
+      canvasCtx.strokeStyle = `${pColor} 0.8)`;
+      
+      canvasCtx.save();
+      canvasCtx.rotate(time * rSpeed);
+      canvasCtx.setLineDash([15, 15]);
+      canvasCtx.beginPath();
+      canvasCtx.arc(0, 0, 55, 0, Math.PI * 2);
+      canvasCtx.stroke();
+      canvasCtx.restore();
+      
+      canvasCtx.save();
+      canvasCtx.rotate(-time * rSpeed * 1.5);
+      canvasCtx.setLineDash([40, 20, 10, 20]);
+      canvasCtx.lineWidth = 4;
+      canvasCtx.beginPath();
+      canvasCtx.arc(0, 0, 80, 0, Math.PI * 2);
+      canvasCtx.stroke();
+      canvasCtx.restore();
+      
+      canvasCtx.save();
+      canvasCtx.rotate(time * rSpeed * 0.5);
+      canvasCtx.setLineDash([2, 8]);
+      canvasCtx.lineWidth = 12;
+      canvasCtx.strokeStyle = `${sColor} 0.4)`;
+      canvasCtx.beginPath();
+      canvasCtx.arc(0, 0, 100, 0, Math.PI * 2);
+      canvasCtx.stroke();
+      canvasCtx.restore();
+      
+      canvasCtx.font = "10px monospace";
+      canvasCtx.fillStyle = `${pColor} 0.9)`;
+      canvasCtx.shadowBlur = 0;
+      canvasCtx.fillText(`SYS.ON // T:${time.toFixed(1)}`, 70, -70);
+      canvasCtx.fillText(`X:${Math.round(palmX)} Y:${Math.round(palmY)}`, 70, -55);
+      canvasCtx.fillText(mode === 'charging' ? "STATUS: OVERRIDE" : "STATUS: STABLE", -110, 95);
+      
+      canvasCtx.restore();
+      
+      const drawTargetNode = (tip) => {
+        const tx = tip.x * w;
+        const ty = tip.y * h;
         
         canvasCtx.beginPath();
-        canvasCtx.arc(midX, midY, purpleRadius, 0, 2 * Math.PI);
-        canvasCtx.fillStyle = gradient;
-        canvasCtx.fill();
-        
-      } else {
-        const angle = Math.atan2(rightY - leftY, rightX - leftX);
-        const bowRadius = 80;
-        
-        canvasCtx.shadowColor = 'rgba(0, 255, 255, 0.8)';
-        canvasCtx.shadowBlur = 20;
-        canvasCtx.strokeStyle = 'rgba(150, 255, 255, 0.9)';
-        canvasCtx.lineWidth = 6;
-        
-        canvasCtx.beginPath();
-        canvasCtx.arc(leftX, leftY, bowRadius, angle - Math.PI/2.5, angle + Math.PI/2.5);
+        canvasCtx.moveTo(palmX, palmY);
+        canvasCtx.lineTo(tx, ty);
+        canvasCtx.strokeStyle = `${pColor} 0.2)`;
+        canvasCtx.lineWidth = 1;
+        canvasCtx.setLineDash([4, 4]);
         canvasCtx.stroke();
+        canvasCtx.setLineDash([]);
         
-        const topX = leftX + Math.cos(angle - Math.PI/2.5) * bowRadius;
-        const topY = leftY + Math.sin(angle - Math.PI/2.5) * bowRadius;
-        const botX = leftX + Math.cos(angle + Math.PI/2.5) * bowRadius;
-        const botY = leftY + Math.sin(angle + Math.PI/2.5) * bowRadius;
-        
+        canvasCtx.strokeStyle = `${pColor} 0.9)`;
         canvasCtx.lineWidth = 2;
+        const s = 6;
         canvasCtx.beginPath();
-        canvasCtx.moveTo(topX, topY);
-        canvasCtx.lineTo(rightX, rightY);
-        canvasCtx.lineTo(botX, botY);
-        canvasCtx.stroke();
-        
-        canvasCtx.shadowColor = 'rgba(255, 200, 0, 0.9)';
-        canvasCtx.strokeStyle = 'rgba(255, 255, 150, 1)';
-        canvasCtx.lineWidth = 5;
-        
-        const arrowLen = dist + 50;
-        const arrowTipX = rightX - Math.cos(angle) * arrowLen;
-        const arrowTipY = rightY - Math.sin(angle) * arrowLen;
-        
-        canvasCtx.beginPath();
-        canvasCtx.moveTo(rightX, rightY);
-        canvasCtx.lineTo(arrowTipX, arrowTipY);
-        canvasCtx.stroke();
-        
-        canvasCtx.fillStyle = 'rgba(255, 255, 150, 1)';
-        canvasCtx.beginPath();
-        canvasCtx.moveTo(arrowTipX, arrowTipY);
-        canvasCtx.lineTo(arrowTipX + Math.cos(angle - 0.5) * 20, arrowTipY + Math.sin(angle - 0.5) * 20);
-        canvasCtx.lineTo(arrowTipX + Math.cos(angle + 0.5) * 20, arrowTipY + Math.sin(angle + 0.5) * 20);
+        canvasCtx.moveTo(tx - s, ty - s);
+        canvasCtx.lineTo(tx + s, ty - s);
+        canvasCtx.lineTo(tx + s, ty + s);
+        canvasCtx.lineTo(tx - s, ty + s);
         canvasCtx.closePath();
-        canvasCtx.fill();
-        
-        canvasCtx.shadowBlur = 0;
-      }
+        canvasCtx.stroke();
+      };
       
-      canvasCtx.globalCompositeOperation = 'source-over';
-    }
-    
-    if (showSkeleton) {
-      for (const landmarks of results.multiHandLandmarks) {
-        window.drawConnectors(canvasCtx, landmarks, window.HAND_CONNECTIONS, {
-          color: 'rgba(0, 255, 128, 0.4)',
-          lineWidth: 2
-        });
-        window.drawLandmarks(canvasCtx, landmarks, {
-          color: 'rgba(255, 50, 50, 0.6)',
-          lineWidth: 1,
-          radius: 2
-        });
-      }
-    }
+      drawTargetNode(thumbTip);
+      drawTargetNode(indexTip);
+      drawTargetNode(middleTip);
+      drawTargetNode(ringTip);
+      drawTargetNode(pinkyTip);
+    });
   }
   canvasCtx.restore();
 }
@@ -176,7 +193,7 @@ hands.onResults(onResults);
 startButton.addEventListener('click', async () => {
   startButton.style.display = 'none';
   spinner.style.display = 'block';
-  statusText.innerText = 'Menghubungkan ke kamera & memuat model...';
+  statusText.innerText = 'Mengkalibrasi Sistem...';
   
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -203,7 +220,7 @@ startButton.addEventListener('click', async () => {
     };
   } catch (err) {
     spinner.style.display = 'none';
-    statusText.innerText = `Akses gagal: ${err.message}`;
-    statusText.style.color = '#ff4d4d';
+    statusText.innerText = `Sistem Gagal: ${err.message}`;
+    statusText.style.color = '#ff3333';
   }
 });
