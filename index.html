@@ -3,24 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cyber Scanner HUD</title>
+  <title>Terminal Interface</title>
   <link rel="stylesheet" href="./style.css">
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 </head>
 <body>
-  <div id="app">
+  <div id="terminal-container">
+    <div id="terminal-output"></div>
+  </div>
+
+  <div id="camera-wrapper">
     <video id="videoElement" autoplay playsinline muted></video>
     <canvas id="canvasElement"></canvas>
-    
-    <div id="ui">
-      <div class="hud-frame">
-        <h1>SISTEM PEMINDAI VISUAL</h1>
-        <button id="startButton">MULAI PEMINDAIAN</button>
-        <p id="statusText"></p>
-      </div>
+    <div id="camera-border"></div>
+  </div>
+  
+  <div id="ui">
+    <div class="init-box">
+      <h1>ROOT_ACCESS</h1>
+      <button id="startButton">CONNECT</button>
+      <p id="statusText"></p>
     </div>
   </div>
+  
   <script type="module" src="./main.js"></script>
 </body>
 </html>
