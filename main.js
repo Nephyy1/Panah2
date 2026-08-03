@@ -40,124 +40,74 @@ function getDistance(p1, p2, w, h) {
   return Math.hypot((p1.x - p2.x) * w, (p1.y - p2.y) * h);
 }
 
-function drawGlitchStatic(ctx, x, y, w, h) {
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x, y, w, h);
-  ctx.clip();
-
-  ctx.filter = 'grayscale(100%) contrast(250%) brightness(80%)';
-  ctx.drawImage(canvasElement, 0, 0);
-  ctx.filter = 'none';
-
-  for (let i = 0; i < 15; i++) {
-    const lineY = y + Math.random() * h;
-    const lineH = Math.random() * 4 + 1;
-    const alpha = Math.random() * 0.5 + 0.1;
-    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-    ctx.fillRect(x, lineY, w, lineH);
+function countExtendedFingers(landmarks, w, h) {
+  const wrist = landmarks[0];
+  let extendedCount = 0;
+  
+  const tips = [8, 12, 16, 20];
+  const pips = [6, 10, 14, 18];
+  
+  for(let i = 0; i < 4; i++) {
+    const dTip = getDistance(landmarks[tips[i]], wrist, w, h);
+    const dPip = getDistance(landmarks[pips[i]], wrist, w, h);
+    if(dTip > dPip) {
+      extendedCount++;
+    }
   }
   
-  for (let i = 0; i < 20; i++) {
-    const lineY = y + Math.random() * h;
-    const lineH = Math.random() * 2 + 1;
-    const alpha = Math.random() * 0.3 + 0.1;
-    ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
-    ctx.fillRect(x, lineY, w, lineH);
+  const thumbTip = landmarks[4];
+  const thumbIp = landmarks[3];
+  const indexMcp = landmarks[5];
+  const dThumb = getDistance(thumbTip, indexMcp, w, h);
+  const dThumbIp = getDistance(thumbIp, indexMcp, w, h);
+  if(dThumb > dThumbIp) {
+    extendedCount++;
   }
-
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x, y, w, h);
   
-  ctx.fillStyle = '#fff';
-  ctx.font = '10px monospace';
-  ctx.fillText('SIG_LOST', x + 5, y + 15);
-  ctx.restore();
+  return extendedCount;
 }
 
-function drawGrid(ctx, w, h) {
-  ctx.strokeStyle = 'rgba(0, 255, 0, 0.3)';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < w; i += 20) {
-    ctx.beginPath();
-    ctx.moveTo(i, 0);
-    ctx.lineTo(i, h);
-    ctx.stroke();
+function detectSpecificGesture(landmarks, w, h) {
+  const thumbTip = landmarks[4];
+  const indexTip = landmarks[8];
+  const middleTip = landmarks[12];
+  const ringTip = landmarks[16];
+  const pinkyTip = landmarks[20];
+  const wrist = landmarks[0];
+
+  const extCount = countExtendedFingers(landmarks, w, h);
+
+  const dIndex = getDistance(indexTip, wrist, w, h);
+  const dMiddle = getDistance(middleTip, wrist, w, h);
+  const dRing = getDistance(ringTip, wrist, w, h);
+  const dPinky = getDistance(pinkyTip, wrist, w, h);
+
+  if (extCount === 1 && dIndex > dMiddle && dIndex > dRing && dIndex > dPinky) {
+    return 'GESTURE_1';
   }
-  for (let j = 0; j < h; j += 20) {
-    ctx.beginPath();
-    ctx.moveTo(0, j);
-    ctx.lineTo(w, j);
-    ctx.stroke();
+  if (extCount === 2 && dIndex > dRing && dMiddle > dRing) {
+    return 'GESTURE_2';
   }
-}
+  if (extCount === 3) {
+    return 'GESTURE_3';
+  }
+  if (extCount === 4 && countExtendedFingers(landmarks, w, h) === 4) {
+    return 'GESTURE_4';
+  }
+  if (extCount === 5) {
+    return 'GESTURE_5';
+  }
 
-function drawSecureLink(ctx, x1, y1, x2, y2, time) {
-  ctx.save();
-  ctx.strokeStyle = '#00ffff';
-  ctx.lineWidth = 2;
-  ctx.shadowColor = '#00ffff';
-  ctx.shadowBlur = 10;
-  
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.stroke();
+  if (extCount === 1 && thumbTip.y < landmarks[3].y && indexTip.y > landmarks[6].y) {
+    if (thumbTip.y < wrist.y) return 'LIKE';
+    else return 'DISLIKE';
+  }
 
-  ctx.beginPath();
-  ctx.arc(x1, y1, 8, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
-  ctx.fill();
-  ctx.stroke();
+  if (extCount === 1 && middleTip.y < landmarks[10].y && indexTip.y > landmarks[6].y && ringTip.y > landmarks[14].y) {
+    return 'FUCK';
+  }
 
-  ctx.beginPath();
-  ctx.arc(x2, y2, 8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const progress = (time % 100) / 100;
-  
-  const px = x1 + dx * progress;
-  const py = y1 + dy * progress;
-
-  ctx.fillStyle = '#fff';
-  ctx.shadowBlur = 20;
-  ctx.beginPath();
-  ctx.arc(px, py, 4, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.font = '10px monospace';
-  ctx.fillStyle = '#00ffff';
-  ctx.shadowBlur = 0;
-  ctx.fillText('ENC_KEY_EXCHANGE', x1 + 15, y1 - 10);
-  ctx.fillText('ESTABLISHED', x2 + 15, y2 - 10);
-
-  ctx.restore();
-}
-
-function drawHeart(ctx, x, y, time) {
-  const scale = 1 + Math.sin(time) * 0.2;
-  
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  
-  ctx.fillStyle = 'rgba(255, 105, 180, 0.8)';
-  ctx.shadowColor = '#ff69b4';
-  ctx.shadowBlur = 15;
-  
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.bezierCurveTo(0, -15, -25, -15, -25, 0);
-  ctx.bezierCurveTo(-25, 15, 0, 25, 0, 35);
-  ctx.bezierCurveTo(0, 25, 25, 15, 25, 0);
-  ctx.bezierCurveTo(25, -15, 0, -15, 0, 0);
-  ctx.fill();
-  
-  ctx.restore();
+  return null;
 }
 
 function onResults(results) {
@@ -180,87 +130,34 @@ function onResults(results) {
 
   canvasCtx.drawImage(videoElement, sx, sy, sw, sh);
 
-  let currentGesture = 'SCANNING...';
-  const time = performance.now() * 0.05;
+  let currentGesture = 'IDLE';
 
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     if (results.multiHandLandmarks.length === 2) {
       const hand1 = results.multiHandLandmarks[0];
       const hand2 = results.multiHandLandmarks[1];
-
-      const pinch1 = getDistance(hand1[4], hand1[8], sw, sh);
-      const pinch2 = getDistance(hand2[4], hand2[8], sw, sh);
       
       const thumbDist = getDistance(hand1[4], hand2[4], sw, sh);
       const indexDist = getDistance(hand1[8], hand2[8], sw, sh);
 
       if (thumbDist < 40 && indexDist < 40) {
         currentGesture = 'LOVE_SIGN';
-        
-        const cx = sx + ((hand1[4].x + hand2[4].x + hand1[8].x + hand2[8].x) / 4) * sw;
-        const cy = sy + ((hand1[4].y + hand2[4].y + hand1[8].y + hand2[8].y) / 4) * sh;
-        
-        drawHeart(canvasCtx, cx, cy, time);
-      } else if (pinch1 < 30 && pinch2 < 30) {
-        currentGesture = 'SECURE_LINK';
-        
-        const p1x = sx + ((hand1[4].x + hand1[8].x) / 2) * sw;
-        const p1y = sy + ((hand1[4].y + hand1[8].y) / 2) * sh;
-        const p2x = sx + ((hand2[4].x + hand2[8].x) / 2) * sw;
-        const p2y = sy + ((hand2[4].y + hand2[8].y) / 2) * sh;
-
-        drawSecureLink(canvasCtx, p1x, p1y, p2x, p2y, time);
-      } else {
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        
-        results.multiHandLandmarks.forEach(landmarks => {
-          [4, 8].forEach(index => {
-            const px = sx + landmarks[index].x * sw;
-            const py = sy + landmarks[index].y * sh;
-            if (px < minX) minX = px;
-            if (px > maxX) maxX = px;
-            if (py < minY) minY = py;
-            if (py > maxY) maxY = py;
-          });
-        });
-
-        const w = maxX - minX;
-        const h = maxY - minY;
-
-        if (w > 30 && h > 30) {
-          currentGesture = 'SIGNAL_INTERFERENCE';
-          drawGlitchStatic(canvasCtx, minX, minY, w, h);
-        }
       }
-    } else if (results.multiHandLandmarks.length === 1) {
+    }
+
+    if (currentGesture !== 'LOVE_SIGN') {
       const landmarks = results.multiHandLandmarks[0];
-      const base = landmarks[0];
-      const indexTip = landmarks[8];
-      const middleTip = landmarks[12];
-      
-      const dIndexBase = getDistance(indexTip, base, sw, sh);
-      const dMidBase = getDistance(middleTip, base, sw, sh);
-      
-      if (dIndexBase < 50 && dMidBase < 50) {
-        currentGesture = 'ACCESS_DENIED';
-        canvasCtx.fillStyle = 'rgba(255, 0, 0, 0.3)';
-        canvasCtx.fillRect(0, 0, cw, ch);
-        canvasCtx.fillStyle = '#f00';
-        canvasCtx.font = '16px monospace';
-        canvasCtx.fillText('SECURITY ALERT', 10, 20);
-      } else if (dIndexBase > 100 && dMidBase > 100) {
-        currentGesture = 'DATA_INTERCEPT';
-        canvasCtx.fillStyle = 'rgba(0, 255, 0, 0.1)';
-        canvasCtx.fillRect(0, 0, cw, ch);
-        drawGrid(canvasCtx, cw, ch);
-        
-        landmarks.forEach(lm => {
-          const px = sx + lm.x * sw;
-          const py = sy + lm.y * sh;
-          canvasCtx.fillStyle = '#0f0';
-          canvasCtx.fillRect(px - 2, py - 2, 4, 4);
-        });
-      }
+      currentGesture = detectSpecificGesture(landmarks, sw, sh) || 'TRACKING';
+
+      window.drawConnectors(canvasCtx, landmarks, window.HAND_CONNECTIONS, {
+        color: '#4fc1ff',
+        lineWidth: 2
+      });
+      window.drawLandmarks(canvasCtx, landmarks, {
+        color: '#dcdcaa',
+        lineWidth: 1,
+        radius: 3
+      });
     }
   }
 
@@ -274,27 +171,28 @@ function onResults(results) {
   canvasCtx.restore();
 
   if (currentGesture !== lastGesture) {
-    if (currentGesture === 'ACCESS_DENIED') {
-      printTerminal('ERR: UNAUTHORIZED CLOSURE DETECTED. SYSTEM LOCKDOWN INITIATED.', 'error');
-    } else if (currentGesture === 'DATA_INTERCEPT') {
-      printTerminal('SYS: INTERCEPTING PACKETS... NODE CONNECTION ESTABLISHED.', 'info');
-    } else if (currentGesture === 'SIGNAL_INTERFERENCE') {
-      printTerminal('WARN: ANOMALY DETECTED. VIDEO SIGNAL DEGRADATION.', 'warn');
-    } else if (currentGesture === 'SECURE_LINK') {
-      printTerminal('SYS: INITIATING SECURE P2P TUNNEL... KEY EXCHANGE COMPLETE.', 'success');
+    if (currentGesture === 'GESTURE_1') {
+      printTerminal('const count = 1;', 'info');
+    } else if (currentGesture === 'GESTURE_2') {
+      printTerminal('const count = 2;', 'info');
+    } else if (currentGesture === 'GESTURE_3') {
+      printTerminal('const count = 3;', 'info');
+    } else if (currentGesture === 'GESTURE_4') {
+      printTerminal('const count = 4;', 'info');
+    } else if (currentGesture === 'GESTURE_5') {
+      printTerminal('const count = 5; // Full array length', 'info');
+    } else if (currentGesture === 'LIKE') {
+      printTerminal('console.log("Feedback: APPROVED");', 'success');
+    } else if (currentGesture === 'DISLIKE') {
+      printTerminal('console.warn("Feedback: REJECTED");', 'warn');
+    } else if (currentGesture === 'FUCK') {
+      printTerminal('throw new Error("Access Forbidden by Gesture");', 'error');
     } else if (currentGesture === 'LOVE_SIGN') {
-      printTerminal('> npm install @nephyy/love --save', 'love');
-      setTimeout(() => {
-        if(lastGesture === 'LOVE_SIGN') printTerminal('added 1 package, and audited 100% feelings in 3s', 'love');
-      }, 800);
+      printTerminal('npm install @nephyy/love --save', 'love');
     } else {
-      printTerminal('SYS: AWAITING INPUT ALGORITHM...', 'normal');
+      printTerminal('SYS: AWAITING GESTURE...', 'normal');
     }
     lastGesture = currentGesture;
-  } else {
-    if (Math.random() < 0.05 && currentGesture !== 'LOVE_SIGN') {
-      printTerminal(`SYS: STREAMING HEX_DUMP [0x${Math.floor(Math.random()*16777215).toString(16)}]`, 'normal');
-    }
   }
 }
 
@@ -315,10 +213,10 @@ hands.onResults(onResults);
 
 startButton.addEventListener('click', async () => {
   startButton.style.display = 'none';
-  statusText.innerText = 'EXECUTING BOOT SEQ...';
+  statusText.innerText = 'Starting development server...';
   
-  printTerminal('SYS: INITIALIZING KERNEL...', 'info');
-  printTerminal('SYS: MOUNTING VIRTUAL CAMERA...', 'normal');
+  printTerminal('> hand-landmark-maker@1.0.0 dev', 'info');
+  printTerminal('> vite', 'normal');
   
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -337,8 +235,8 @@ startButton.addEventListener('click', async () => {
       cameraWrapper.style.display = 'flex';
       resizeCanvas();
       
-      printTerminal('SYS: CAMERA FEED ACTIVE.', 'success');
-      printTerminal('SYS: HAND TRACKING ENGINE ONLINE.', 'info');
+      printTerminal('VITE v5.0.0  ready in 350 ms', 'success');
+      printTerminal('➜  Local:   http://localhost:3000/', 'info');
       
       async function detectionFrame() {
         if (!videoElement.paused && !videoElement.ended) {
@@ -351,7 +249,7 @@ startButton.addEventListener('click', async () => {
     };
   } catch (err) {
     startButton.style.display = 'block';
-    statusText.innerText = `ERR: ${err.message}`;
-    printTerminal(`ERR: HARDWARE FAILURE - ${err.message}`, 'error');
+    statusText.innerText = `Error: ${err.message}`;
+    printTerminal(`Error accessing media devices: ${err.message}`, 'error');
   }
 });
