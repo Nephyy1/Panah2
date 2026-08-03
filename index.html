@@ -3,18 +3,17 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HandFX Studio</title>
+    <title>Repulsor HUD Studio</title>
     <link rel="stylesheet" href="./style.css">
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
   </head>
   <body>
     <div class="app-container">
       <header>
-        <h1>HandFX Studio</h1>
-        <p>Deteksi Tangan & Efek Visual</p>
+        <h1>TARGETING SYSTEM</h1>
+        <p>Advanced Holographic Interface</p>
       </header>
       
       <main class="video-wrapper">
@@ -23,15 +22,10 @@
         
         <div id="statusOverlay" class="overlay">
           <div class="spinner"></div>
-          <p id="statusText">Menunggu akses kamera...</p>
-          <button id="startButton">Mulai Kamera</button>
+          <p id="statusText">Sistem Offline</p>
+          <button id="startButton">Inisialisasi Sistem</button>
         </div>
       </main>
-
-      <div class="controls">
-        <button id="toggleSkeleton" class="control-btn active">Kerangka: ON</button>
-        <button id="toggleEffect" class="control-btn active">Efek Hollow: ON</button>
-      </div>
     </div>
     <script type="module" src="./main.js"></script>
   </body>
