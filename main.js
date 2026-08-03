@@ -1,20 +1,44 @@
 const videoElement = document.getElementById('videoElement');
 const canvasElement = document.getElementById('canvasElement');
 const canvasCtx = canvasElement.getContext('2d');
-const statusElement = document.getElementById('status');
+const statusOverlay = document.getElementById('statusOverlay');
 const statusText = document.getElementById('statusText');
 const startButton = document.getElementById('startButton');
+const spinner = document.querySelector('.spinner');
+const toggleSkeleton = document.getElementById('toggleSkeleton');
+const toggleEffect = document.getElementById('toggleEffect');
+
+let showSkeleton = true;
+let showEffect = true;
+
+toggleSkeleton.addEventListener('click', () => {
+  showSkeleton = !showSkeleton;
+  toggleSkeleton.textContent = `Kerangka: ${showSkeleton ? 'ON' : 'OFF'}`;
+  toggleSkeleton.classList.toggle('active', showSkeleton);
+});
+
+toggleEffect.addEventListener('click', () => {
+  showEffect = !showEffect;
+  toggleEffect.textContent = `Efek Hollow: ${showEffect ? 'ON' : 'OFF'}`;
+  toggleEffect.classList.toggle('active', showEffect);
+});
+
+function resizeCanvas() {
+  canvasElement.width = videoElement.videoWidth || 640;
+  canvasElement.height = videoElement.videoHeight || 480;
+}
 
 function onResults(results) {
-  if (statusElement.style.display !== 'none') {
-    statusElement.style.display = 'none';
+  if (statusOverlay.style.display !== 'none') {
+    statusOverlay.style.display = 'none';
+    resizeCanvas();
   }
   
   canvasCtx.save();
   canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
   
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-    if (results.multiHandLandmarks.length === 2) {
+    if (showEffect && results.multiHandLandmarks.length === 2) {
       const hand1 = results.multiHandLandmarks[0];
       const hand2 = results.multiHandLandmarks[1];
       
@@ -34,30 +58,30 @@ function onResults(results) {
       canvasCtx.beginPath();
       canvasCtx.moveTo(x1, y1);
       canvasCtx.lineTo(midX, midY);
-      canvasCtx.strokeStyle = 'rgba(255, 0, 0, 0.6)';
-      canvasCtx.lineWidth = 4;
+      canvasCtx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+      canvasCtx.lineWidth = 5;
       canvasCtx.stroke();
       
       canvasCtx.beginPath();
-      canvasCtx.arc(x1, y1, 10, 0, 2 * Math.PI);
-      canvasCtx.fillStyle = 'rgba(255, 0, 0, 0.9)';
+      canvasCtx.arc(x1, y1, 12, 0, 2 * Math.PI);
+      canvasCtx.fillStyle = 'rgba(255, 0, 0, 1)';
       canvasCtx.fill();
       
       canvasCtx.beginPath();
       canvasCtx.moveTo(x2, y2);
       canvasCtx.lineTo(midX, midY);
-      canvasCtx.strokeStyle = 'rgba(0, 100, 255, 0.6)';
-      canvasCtx.lineWidth = 4;
+      canvasCtx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
+      canvasCtx.lineWidth = 5;
       canvasCtx.stroke();
       
       canvasCtx.beginPath();
-      canvasCtx.arc(x2, y2, 10, 0, 2 * Math.PI);
-      canvasCtx.fillStyle = 'rgba(0, 100, 255, 0.9)';
+      canvasCtx.arc(x2, y2, 12, 0, 2 * Math.PI);
+      canvasCtx.fillStyle = 'rgba(0, 100, 255, 1)';
       canvasCtx.fill();
       
       const gradient = canvasCtx.createRadialGradient(midX, midY, orbRadius * 0.1, midX, midY, orbRadius);
       gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-      gradient.addColorStop(0.3, 'rgba(148, 0, 211, 0.9)');
+      gradient.addColorStop(0.2, 'rgba(148, 0, 211, 0.9)');
       gradient.addColorStop(1, 'rgba(148, 0, 211, 0)');
       
       canvasCtx.beginPath();
@@ -66,16 +90,18 @@ function onResults(results) {
       canvasCtx.fill();
     }
     
-    for (const landmarks of results.multiHandLandmarks) {
-      window.drawConnectors(canvasCtx, landmarks, window.HAND_CONNECTIONS, {
-        color: 'rgba(0, 255, 0, 0.3)',
-        lineWidth: 2
-      });
-      window.drawLandmarks(canvasCtx, landmarks, {
-        color: 'rgba(255, 0, 0, 0.3)',
-        lineWidth: 1,
-        radius: 2
-      });
+    if (showSkeleton) {
+      for (const landmarks of results.multiHandLandmarks) {
+        window.drawConnectors(canvasCtx, landmarks, window.HAND_CONNECTIONS, {
+          color: 'rgba(0, 255, 128, 0.6)',
+          lineWidth: 3
+        });
+        window.drawLandmarks(canvasCtx, landmarks, {
+          color: 'rgba(255, 50, 50, 0.8)',
+          lineWidth: 1,
+          radius: 3
+        });
+      }
     }
   }
   canvasCtx.restore();
@@ -98,13 +124,14 @@ hands.onResults(onResults);
 
 startButton.addEventListener('click', async () => {
   startButton.style.display = 'none';
-  statusText.style.display = 'block';
+  spinner.style.display = 'block';
+  statusText.innerText = 'Menghubungkan ke kamera & memuat model...';
   
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
-        width: { ideal: 640 },
-        height: { ideal: 480 },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
         facingMode: 'user'
       }
     });
@@ -124,7 +151,8 @@ startButton.addEventListener('click', async () => {
       detectionFrame();
     };
   } catch (err) {
-    statusText.innerText = `Akses kamera gagal: ${err.message}`;
-    statusElement.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
+    spinner.style.display = 'none';
+    statusText.innerText = `Akses gagal: ${err.message}`;
+    statusText.style.color = '#ff4d4d';
   }
 });
