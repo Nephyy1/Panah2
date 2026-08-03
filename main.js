@@ -1,178 +1,133 @@
 const videoElement = document.getElementById('videoElement');
 const canvasElement = document.getElementById('canvasElement');
 const canvasCtx = canvasElement.getContext('2d');
-const statusOverlay = document.getElementById('statusOverlay');
-const statusText = document.getElementById('statusText');
 const startButton = document.getElementById('startButton');
-const spinner = document.querySelector('.spinner');
-
-let shockwaves = [];
-let handStates = {};
+const statusText = document.getElementById('statusText');
+const ui = document.getElementById('ui');
 
 function resizeCanvas() {
-  canvasElement.width = videoElement.videoWidth || 640;
-  canvasElement.height = videoElement.videoHeight || 480;
+  canvasElement.width = window.innerWidth;
+  canvasElement.height = window.innerHeight;
 }
 
-function getDistance(p1, p2, w, h) {
-  return Math.hypot((p1.x - p2.x) * w, (p1.y - p2.y) * h);
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function drawCyberFrame(ctx, x, y, w, h) {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const cornerLength = Math.min(w, h) * 0.15;
+
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = '#00ff88';
+
+  ctx.beginPath();
+  ctx.moveTo(x, y + cornerLength);
+  ctx.lineTo(x, y);
+  ctx.lineTo(x + cornerLength, y);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(x + w - cornerLength, y);
+  ctx.lineTo(x + w, y);
+  ctx.lineTo(x + w, y + cornerLength);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(x, y + h - cornerLength);
+  ctx.lineTo(x, y + h);
+  ctx.lineTo(x + cornerLength, y + h);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(x + w - cornerLength, y + h);
+  ctx.lineTo(x + w, y + h);
+  ctx.lineTo(x + w, y + h - cornerLength);
+  ctx.stroke();
+
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(0, 255, 136, 0.4)';
+  ctx.beginPath();
+  ctx.moveTo(cx, y);
+  ctx.lineTo(cx, y + h);
+  ctx.moveTo(x, cy);
+  ctx.lineTo(x + w, cy);
+  ctx.stroke();
+
+  ctx.font = '14px monospace';
+  ctx.fillStyle = '#00ff88';
+  ctx.fillText(`[REC] TGT_LOCK`, x + 10, y + 25);
+  ctx.fillText(`COORD: ${Math.round(x)},${Math.round(y)}`, x + 10, y + h - 10);
+  
+  const timeStr = new Date().toISOString().substring(11, 23);
+  ctx.fillText(`SYS.T: ${timeStr}`, x + w - 160, y + 25);
 }
 
 function onResults(results) {
-  if (statusOverlay.style.display !== 'none') {
-    statusOverlay.style.display = 'none';
-    resizeCanvas();
-  }
-  
-  canvasCtx.save();
   canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-  canvasCtx.globalCompositeOperation = 'screen';
-  
-  const time = performance.now() * 0.001;
-  const w = canvasElement.width;
-  const h = canvasElement.height;
-  
-  for (let i = shockwaves.length - 1; i >= 0; i--) {
-    const sw = shockwaves[i];
-    sw.radius += 25;
-    sw.alpha -= 0.03;
-    if (sw.alpha <= 0) {
-      shockwaves.splice(i, 1);
-    } else {
-      canvasCtx.beginPath();
-      canvasCtx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
-      canvasCtx.strokeStyle = `rgba(0, 255, 255, ${sw.alpha})`;
-      canvasCtx.lineWidth = 15 * sw.alpha;
-      canvasCtx.stroke();
+
+  const vw = videoElement.videoWidth;
+  const vh = videoElement.videoHeight;
+  const cw = canvasElement.width;
+  const ch = canvasElement.height;
+
+  const scale = Math.max(cw / vw, ch / vh);
+  const sw = vw * scale;
+  const sh = vh * scale;
+  const sx = (cw - sw) / 2;
+  const sy = (ch - sh) / 2;
+
+  canvasCtx.drawImage(videoElement, sx, sy, sw, sh);
+
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let validHands = false;
+
+    results.multiHandLandmarks.forEach(landmarks => {
+      [4, 8].forEach(index => {
+        const px = sx + landmarks[index].x * sw;
+        const py = sy + landmarks[index].y * sh;
+
+        if (px < minX) minX = px;
+        if (px > maxX) maxX = px;
+        if (py < minY) minY = py;
+        if (py > maxY) maxY = py;
+        
+        validHands = true;
+      });
+    });
+
+    if (validHands) {
+      const padding = 40;
+      minX -= padding;
+      minY -= padding;
+      maxX += padding;
+      maxY += padding;
+
+      const w = maxX - minX;
+      const h = maxY - minY;
+
+      if (w > 50 && h > 50) {
+        canvasCtx.save();
+        canvasCtx.beginPath();
+        canvasCtx.rect(minX, minY, w, h);
+        canvasCtx.clip();
+
+        canvasCtx.filter = 'sepia(100%) hue-rotate(270deg) saturate(300%) contrast(150%) invert(10%)';
+        canvasCtx.drawImage(videoElement, sx, sy, sw, sh);
+        
+        canvasCtx.restore();
+
+        canvasCtx.fillStyle = 'rgba(0, 255, 136, 0.1)';
+        canvasCtx.fillRect(minX, minY, w, h);
+
+        drawCyberFrame(canvasCtx, minX, minY, w, h);
+      }
     }
   }
-  
-  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-    results.multiHandLandmarks.forEach((landmarks, index) => {
-      const base = landmarks[0];
-      const midMCP = landmarks[9];
-      const thumbTip = landmarks[4];
-      const indexTip = landmarks[8];
-      const middleTip = landmarks[12];
-      const ringTip = landmarks[16];
-      const pinkyTip = landmarks[20];
-      
-      const palmX = midMCP.x * w;
-      const palmY = midMCP.y * h;
-      
-      const dIndexBase = getDistance(indexTip, base, w, h);
-      const dThumbPinky = getDistance(thumbTip, pinkyTip, w, h);
-      const dMidBase = getDistance(middleTip, base, w, h);
-      
-      let mode = 'standby';
-      let pColor = 'rgba(0, 255, 255,';
-      let sColor = 'rgba(0, 150, 255,';
-      let rSpeed = 1;
-      
-      if (dIndexBase < 100 && dMidBase < 100) {
-        mode = 'fist';
-      } else if (dIndexBase > 200 && dThumbPinky > 200) {
-        mode = 'charging';
-        pColor = 'rgba(255, 60, 0,';
-        sColor = 'rgba(255, 120, 0,';
-        rSpeed = 6;
-      }
-      
-      const handId = `hand_${index}`;
-      if (!handStates[handId]) handStates[handId] = 'standby';
-      
-      if (mode === 'fist' && handStates[handId] !== 'fist') {
-        shockwaves.push({ x: palmX, y: palmY, radius: 20, alpha: 1 });
-      }
-      handStates[handId] = mode;
-      
-      if (mode === 'fist') return;
-      
-      const angle = Math.atan2(midMCP.y - base.y, midMCP.x - base.x) + Math.PI / 2;
-      
-      canvasCtx.save();
-      canvasCtx.translate(palmX, palmY);
-      canvasCtx.rotate(angle);
-      
-      canvasCtx.shadowColor = `${pColor} 1)`;
-      canvasCtx.shadowBlur = mode === 'charging' ? 50 : 20;
-      canvasCtx.fillStyle = `${pColor} 0.95)`;
-      canvasCtx.beginPath();
-      canvasCtx.arc(0, 0, mode === 'charging' ? 30 : 18, 0, Math.PI * 2);
-      canvasCtx.fill();
-      
-      canvasCtx.lineWidth = 2;
-      canvasCtx.strokeStyle = `${pColor} 0.8)`;
-      
-      canvasCtx.save();
-      canvasCtx.rotate(time * rSpeed);
-      canvasCtx.setLineDash([15, 15]);
-      canvasCtx.beginPath();
-      canvasCtx.arc(0, 0, 55, 0, Math.PI * 2);
-      canvasCtx.stroke();
-      canvasCtx.restore();
-      
-      canvasCtx.save();
-      canvasCtx.rotate(-time * rSpeed * 1.5);
-      canvasCtx.setLineDash([40, 20, 10, 20]);
-      canvasCtx.lineWidth = 4;
-      canvasCtx.beginPath();
-      canvasCtx.arc(0, 0, 80, 0, Math.PI * 2);
-      canvasCtx.stroke();
-      canvasCtx.restore();
-      
-      canvasCtx.save();
-      canvasCtx.rotate(time * rSpeed * 0.5);
-      canvasCtx.setLineDash([2, 8]);
-      canvasCtx.lineWidth = 12;
-      canvasCtx.strokeStyle = `${sColor} 0.4)`;
-      canvasCtx.beginPath();
-      canvasCtx.arc(0, 0, 100, 0, Math.PI * 2);
-      canvasCtx.stroke();
-      canvasCtx.restore();
-      
-      canvasCtx.font = "10px monospace";
-      canvasCtx.fillStyle = `${pColor} 0.9)`;
-      canvasCtx.shadowBlur = 0;
-      canvasCtx.fillText(`SYS.ON // T:${time.toFixed(1)}`, 70, -70);
-      canvasCtx.fillText(`X:${Math.round(palmX)} Y:${Math.round(palmY)}`, 70, -55);
-      canvasCtx.fillText(mode === 'charging' ? "STATUS: OVERRIDE" : "STATUS: STABLE", -110, 95);
-      
-      canvasCtx.restore();
-      
-      const drawTargetNode = (tip) => {
-        const tx = tip.x * w;
-        const ty = tip.y * h;
-        
-        canvasCtx.beginPath();
-        canvasCtx.moveTo(palmX, palmY);
-        canvasCtx.lineTo(tx, ty);
-        canvasCtx.strokeStyle = `${pColor} 0.2)`;
-        canvasCtx.lineWidth = 1;
-        canvasCtx.setLineDash([4, 4]);
-        canvasCtx.stroke();
-        canvasCtx.setLineDash([]);
-        
-        canvasCtx.strokeStyle = `${pColor} 0.9)`;
-        canvasCtx.lineWidth = 2;
-        const s = 6;
-        canvasCtx.beginPath();
-        canvasCtx.moveTo(tx - s, ty - s);
-        canvasCtx.lineTo(tx + s, ty - s);
-        canvasCtx.lineTo(tx + s, ty + s);
-        canvasCtx.lineTo(tx - s, ty + s);
-        canvasCtx.closePath();
-        canvasCtx.stroke();
-      };
-      
-      drawTargetNode(thumbTip);
-      drawTargetNode(indexTip);
-      drawTargetNode(middleTip);
-      drawTargetNode(ringTip);
-      drawTargetNode(pinkyTip);
-    });
-  }
-  canvasCtx.restore();
 }
 
 const hands = new window.Hands({
@@ -192,8 +147,7 @@ hands.onResults(onResults);
 
 startButton.addEventListener('click', async () => {
   startButton.style.display = 'none';
-  spinner.style.display = 'block';
-  statusText.innerText = 'Mengkalibrasi Sistem...';
+  statusText.innerText = 'MEMUAT SISTEM...';
   
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -208,6 +162,8 @@ startButton.addEventListener('click', async () => {
     
     videoElement.onloadedmetadata = () => {
       videoElement.play();
+      ui.style.opacity = '0';
+      setTimeout(() => { ui.style.display = 'none'; }, 500);
       
       async function detectionFrame() {
         if (!videoElement.paused && !videoElement.ended) {
@@ -219,8 +175,7 @@ startButton.addEventListener('click', async () => {
       detectionFrame();
     };
   } catch (err) {
-    spinner.style.display = 'none';
-    statusText.innerText = `Sistem Gagal: ${err.message}`;
-    statusText.style.color = '#ff3333';
+    startButton.style.display = 'block';
+    statusText.innerText = `AKSES GAGAL: ${err.message}`;
   }
 });
