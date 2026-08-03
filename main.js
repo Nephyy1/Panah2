@@ -1,4 +1,3 @@
-import { Camera } from '@mediapipe/camera_utils';
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { Hands, HAND_CONNECTIONS } from '@mediapipe/hands';
 
@@ -46,15 +45,34 @@ hands.setOptions({
 
 hands.onResults(onResults);
 
-const camera = new Camera(videoElement, {
-  onFrame: async () => {
-    await hands.send({ image: videoElement });
-  },
-  width: 640,
-  height: 480
-});
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        facingMode: 'user'
+      }
+    });
+    
+    videoElement.srcObject = stream;
+    
+    videoElement.onloadedmetadata = () => {
+      videoElement.play();
+      
+      async function detectionFrame() {
+        if (!videoElement.paused && !videoElement.ended) {
+          await hands.send({ image: videoElement });
+        }
+        requestAnimationFrame(detectionFrame);
+      }
+      
+      detectionFrame();
+    };
+  } catch (err) {
+    statusElement.innerText = `Akses kamera gagal: ${err.message}`;
+    statusElement.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
+  }
+}
 
-camera.start().catch((err) => {
-  statusElement.innerText = `Akses kamera ditolak atau gagal: ${err.message}`;
-  statusElement.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
-});
+startCamera();
