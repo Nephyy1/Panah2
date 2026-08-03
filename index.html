@@ -3,26 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Terminal Interface</title>
+  <title>Developer Workspace</title>
   <link rel="stylesheet" href="./style.css">
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 </head>
 <body>
-  <div id="terminal-container">
-    <div id="terminal-output"></div>
+  <div id="ide-container">
+    <div class="sidebar">
+      <div class="file-explorer">EXPLORER</div>
+      <div class="file">📄 index.html</div>
+      <div class="file">🎨 style.css</div>
+      <div class="file active-file">📜 main.js</div>
+    </div>
+    <div class="main-panel">
+      <div class="tabs">
+        <div class="tab">main.js</div>
+      </div>
+      <div id="terminal-container">
+        <div class="terminal-header">TERMINAL - bash</div>
+        <div id="terminal-output"></div>
+      </div>
+    </div>
   </div>
 
   <div id="camera-wrapper">
+    <div class="camera-header">Live Preview</div>
     <video id="videoElement" autoplay playsinline muted></video>
     <canvas id="canvasElement"></canvas>
-    <div id="camera-border"></div>
   </div>
   
   <div id="ui">
     <div class="init-box">
-      <h1>ROOT_ACCESS</h1>
-      <button id="startButton">CONNECT</button>
+      <h1>WORKSPACE READY</h1>
+      <button id="startButton">Run Dev Server</button>
       <p id="statusText"></p>
     </div>
   </div>
