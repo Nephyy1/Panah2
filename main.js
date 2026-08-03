@@ -85,6 +85,51 @@ function drawGrid(ctx, w, h) {
   }
 }
 
+function drawSecureLink(ctx, x1, y1, x2, y2, time) {
+  ctx.save();
+  ctx.strokeStyle = '#00ffff';
+  ctx.lineWidth = 2;
+  ctx.shadowColor = '#00ffff';
+  ctx.shadowBlur = 10;
+  
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(x1, y1, 8, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0, 255, 255, 0.5)';
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(x2, y2, 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const progress = (time % 100) / 100;
+  
+  const px = x1 + dx * progress;
+  const py = y1 + dy * progress;
+
+  ctx.fillStyle = '#fff';
+  ctx.shadowBlur = 20;
+  ctx.beginPath();
+  ctx.arc(px, py, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.font = '10px monospace';
+  ctx.fillStyle = '#00ffff';
+  ctx.shadowBlur = 0;
+  ctx.fillText('ENC_KEY_EXCHANGE', x1 + 15, y1 - 10);
+  ctx.fillText('ESTABLISHED', x2 + 15, y2 - 10);
+
+  ctx.restore();
+}
+
 function onResults(results) {
   if (canvasElement.width === 0) resizeCanvas();
   
@@ -106,28 +151,46 @@ function onResults(results) {
   canvasCtx.drawImage(videoElement, sx, sy, sw, sh);
 
   let currentGesture = 'SCANNING...';
+  const time = performance.now() * 0.05;
 
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     if (results.multiHandLandmarks.length === 2) {
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      
-      results.multiHandLandmarks.forEach(landmarks => {
-        [4, 8].forEach(index => {
-          const px = sx + landmarks[index].x * sw;
-          const py = sy + landmarks[index].y * sh;
-          if (px < minX) minX = px;
-          if (px > maxX) maxX = px;
-          if (py < minY) minY = py;
-          if (py > maxY) maxY = py;
+      const hand1 = results.multiHandLandmarks[0];
+      const hand2 = results.multiHandLandmarks[1];
+
+      const pinch1 = getDistance(hand1[4], hand1[8], sw, sh);
+      const pinch2 = getDistance(hand2[4], hand2[8], sw, sh);
+
+      if (pinch1 < 30 && pinch2 < 30) {
+        currentGesture = 'SECURE_LINK';
+        
+        const p1x = sx + ((hand1[4].x + hand1[8].x) / 2) * sw;
+        const p1y = sy + ((hand1[4].y + hand1[8].y) / 2) * sh;
+        const p2x = sx + ((hand2[4].x + hand2[8].x) / 2) * sw;
+        const p2y = sy + ((hand2[4].y + hand2[8].y) / 2) * sh;
+
+        drawSecureLink(canvasCtx, p1x, p1y, p2x, p2y, time);
+      } else {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        
+        results.multiHandLandmarks.forEach(landmarks => {
+          [4, 8].forEach(index => {
+            const px = sx + landmarks[index].x * sw;
+            const py = sy + landmarks[index].y * sh;
+            if (px < minX) minX = px;
+            if (px > maxX) maxX = px;
+            if (py < minY) minY = py;
+            if (py > maxY) maxY = py;
+          });
         });
-      });
 
-      const w = maxX - minX;
-      const h = maxY - minY;
+        const w = maxX - minX;
+        const h = maxY - minY;
 
-      if (w > 30 && h > 30) {
-        currentGesture = 'SIGNAL_INTERFERENCE';
-        drawGlitchStatic(canvasCtx, minX, minY, w, h);
+        if (w > 30 && h > 30) {
+          currentGesture = 'SIGNAL_INTERFERENCE';
+          drawGlitchStatic(canvasCtx, minX, minY, w, h);
+        }
       }
     } else if (results.multiHandLandmarks.length === 1) {
       const landmarks = results.multiHandLandmarks[0];
@@ -168,6 +231,8 @@ function onResults(results) {
       printTerminal('SYS: INTERCEPTING PACKETS... NODE CONNECTION ESTABLISHED.');
     } else if (currentGesture === 'SIGNAL_INTERFERENCE') {
       printTerminal('WARN: ANOMALY DETECTED. VIDEO SIGNAL DEGRADATION.');
+    } else if (currentGesture === 'SECURE_LINK') {
+      printTerminal('SYS: INITIATING SECURE P2P TUNNEL... KEY EXCHANGE COMPLETE.');
     } else {
       printTerminal('SYS: AWAITING INPUT ALGORITHM...');
     }
