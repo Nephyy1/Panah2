@@ -5,6 +5,8 @@ const videoElement = document.getElementById('videoElement');
 const canvasElement = document.getElementById('canvasElement');
 const canvasCtx = canvasElement.getContext('2d');
 const statusElement = document.getElementById('status');
+const statusText = document.getElementById('statusText');
+const startButton = document.getElementById('startButton');
 
 function onResults(results) {
   if (statusElement.style.display !== 'none') {
@@ -45,7 +47,10 @@ hands.setOptions({
 
 hands.onResults(onResults);
 
-async function startCamera() {
+startButton.addEventListener('click', async () => {
+  startButton.style.display = 'none';
+  statusText.style.display = 'block';
+  
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
@@ -70,9 +75,7 @@ async function startCamera() {
       detectionFrame();
     };
   } catch (err) {
-    statusElement.innerText = `Akses kamera gagal: ${err.message}`;
+    statusText.innerText = `Akses kamera gagal: ${err.message}`;
     statusElement.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
   }
-}
-
-startCamera();
+});
