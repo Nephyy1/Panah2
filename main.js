@@ -19,6 +19,7 @@ function printTerminal(text, type = 'normal') {
   if (type === 'warn') color = '#cca700';
   if (type === 'success') color = '#4caf50';
   if (type === 'info') color = '#569cd6';
+  if (type === 'love') color = '#ff69b4';
 
   terminalLogs.push(`<span style="color: #6a9955">[${time}]</span> <span style="color: ${color}">${text}</span>`);
   if (terminalLogs.length > maxLogs) {
@@ -137,6 +138,28 @@ function drawSecureLink(ctx, x1, y1, x2, y2, time) {
   ctx.restore();
 }
 
+function drawHeart(ctx, x, y, time) {
+  const scale = 1 + Math.sin(time) * 0.2;
+  
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  
+  ctx.fillStyle = 'rgba(255, 105, 180, 0.8)';
+  ctx.shadowColor = '#ff69b4';
+  ctx.shadowBlur = 15;
+  
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.bezierCurveTo(0, -15, -25, -15, -25, 0);
+  ctx.bezierCurveTo(-25, 15, 0, 25, 0, 35);
+  ctx.bezierCurveTo(0, 25, 25, 15, 25, 0);
+  ctx.bezierCurveTo(25, -15, 0, -15, 0, 0);
+  ctx.fill();
+  
+  ctx.restore();
+}
+
 function onResults(results) {
   if (canvasElement.width === 0) resizeCanvas();
   
@@ -167,8 +190,18 @@ function onResults(results) {
 
       const pinch1 = getDistance(hand1[4], hand1[8], sw, sh);
       const pinch2 = getDistance(hand2[4], hand2[8], sw, sh);
+      
+      const thumbDist = getDistance(hand1[4], hand2[4], sw, sh);
+      const indexDist = getDistance(hand1[8], hand2[8], sw, sh);
 
-      if (pinch1 < 30 && pinch2 < 30) {
+      if (thumbDist < 40 && indexDist < 40) {
+        currentGesture = 'LOVE_SIGN';
+        
+        const cx = sx + ((hand1[4].x + hand2[4].x + hand1[8].x + hand2[8].x) / 4) * sw;
+        const cy = sy + ((hand1[4].y + hand2[4].y + hand1[8].y + hand2[8].y) / 4) * sh;
+        
+        drawHeart(canvasCtx, cx, cy, time);
+      } else if (pinch1 < 30 && pinch2 < 30) {
         currentGesture = 'SECURE_LINK';
         
         const p1x = sx + ((hand1[4].x + hand1[8].x) / 2) * sw;
@@ -249,12 +282,17 @@ function onResults(results) {
       printTerminal('WARN: ANOMALY DETECTED. VIDEO SIGNAL DEGRADATION.', 'warn');
     } else if (currentGesture === 'SECURE_LINK') {
       printTerminal('SYS: INITIATING SECURE P2P TUNNEL... KEY EXCHANGE COMPLETE.', 'success');
+    } else if (currentGesture === 'LOVE_SIGN') {
+      printTerminal('> npm install @nephyy/love --save', 'love');
+      setTimeout(() => {
+        if(lastGesture === 'LOVE_SIGN') printTerminal('added 1 package, and audited 100% feelings in 3s', 'love');
+      }, 800);
     } else {
       printTerminal('SYS: AWAITING INPUT ALGORITHM...', 'normal');
     }
     lastGesture = currentGesture;
   } else {
-    if (Math.random() < 0.05) {
+    if (Math.random() < 0.05 && currentGesture !== 'LOVE_SIGN') {
       printTerminal(`SYS: STREAMING HEX_DUMP [0x${Math.floor(Math.random()*16777215).toString(16)}]`, 'normal');
     }
   }
