@@ -8,8 +8,11 @@ const spinner = document.querySelector('.spinner');
 const toggleSkeleton = document.getElementById('toggleSkeleton');
 const toggleEffect = document.getElementById('toggleEffect');
 
-let showSkeleton = true;
+let showSkeleton = false;
 let showEffect = true;
+
+toggleSkeleton.textContent = 'Kerangka: OFF';
+toggleSkeleton.classList.remove('active');
 
 toggleSkeleton.addEventListener('click', () => {
   showSkeleton = !showSkeleton;
@@ -19,13 +22,23 @@ toggleSkeleton.addEventListener('click', () => {
 
 toggleEffect.addEventListener('click', () => {
   showEffect = !showEffect;
-  toggleEffect.textContent = `Efek Hollow: ${showEffect ? 'ON' : 'OFF'}`;
+  toggleEffect.textContent = `Efek Visual: ${showEffect ? 'ON' : 'OFF'}`;
   toggleEffect.classList.toggle('active', showEffect);
 });
 
 function resizeCanvas() {
   canvasElement.width = videoElement.videoWidth || 640;
   canvasElement.height = videoElement.videoHeight || 480;
+}
+
+function drawGlowSphere(ctx, x, y, radius, color, glowColor) {
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, 2 * Math.PI);
+  ctx.fillStyle = color;
+  ctx.shadowColor = glowColor;
+  ctx.shadowBlur = radius * 2;
+  ctx.fill();
+  ctx.shadowBlur = 0;
 }
 
 function onResults(results) {
@@ -39,67 +52,105 @@ function onResults(results) {
   
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     if (showEffect && results.multiHandLandmarks.length === 2) {
-      const hand1 = results.multiHandLandmarks[0];
-      const hand2 = results.multiHandLandmarks[1];
+      canvasCtx.globalCompositeOperation = 'screen';
       
-      const indexTip1 = hand1[8];
-      const indexTip2 = hand2[8];
+      const tip1 = results.multiHandLandmarks[0][8];
+      const tip2 = results.multiHandLandmarks[1][8];
       
-      const x1 = indexTip1.x * canvasElement.width;
-      const y1 = indexTip1.y * canvasElement.height;
-      const x2 = indexTip2.x * canvasElement.width;
-      const y2 = indexTip2.y * canvasElement.height;
+      const xA = tip1.x * canvasElement.width;
+      const yA = tip1.y * canvasElement.height;
+      const xB = tip2.x * canvasElement.width;
+      const yB = tip2.y * canvasElement.height;
       
-      const midX = (x1 + x2) / 2;
-      const midY = (y1 + y2) / 2;
-      const distance = Math.hypot(x2 - x1, y2 - y1);
-      const orbRadius = distance * 0.4;
+      const leftX = xA < xB ? xA : xB;
+      const leftY = xA < xB ? yA : yB;
+      const rightX = xA < xB ? xB : xA;
+      const rightY = xA < xB ? yB : yA;
       
-      canvasCtx.beginPath();
-      canvasCtx.moveTo(x1, y1);
-      canvasCtx.lineTo(midX, midY);
-      canvasCtx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
-      canvasCtx.lineWidth = 5;
-      canvasCtx.stroke();
+      const dist = Math.hypot(rightX - leftX, rightY - leftY);
       
-      canvasCtx.beginPath();
-      canvasCtx.arc(x1, y1, 12, 0, 2 * Math.PI);
-      canvasCtx.fillStyle = 'rgba(255, 0, 0, 1)';
-      canvasCtx.fill();
+      if (dist < 250) {
+        const midX = (leftX + rightX) / 2;
+        const midY = (leftY + rightY) / 2;
+        const intensity = Math.max(0, 250 - dist) / 250;
+        
+        drawGlowSphere(canvasCtx, leftX, leftY, 20 + (intensity * 10), 'rgba(255, 100, 100, 0.8)', 'red');
+        drawGlowSphere(canvasCtx, rightX, rightY, 20 + (intensity * 10), 'rgba(100, 150, 255, 0.8)', 'blue');
+        
+        const purpleRadius = 30 + (intensity * 120);
+        const gradient = canvasCtx.createRadialGradient(midX, midY, purpleRadius * 0.1, midX, midY, purpleRadius);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        gradient.addColorStop(0.2, 'rgba(200, 100, 255, 0.9)');
+        gradient.addColorStop(0.6, 'rgba(138, 43, 226, 0.5)');
+        gradient.addColorStop(1, 'rgba(138, 43, 226, 0)');
+        
+        canvasCtx.beginPath();
+        canvasCtx.arc(midX, midY, purpleRadius, 0, 2 * Math.PI);
+        canvasCtx.fillStyle = gradient;
+        canvasCtx.fill();
+        
+      } else {
+        const angle = Math.atan2(rightY - leftY, rightX - leftX);
+        const bowRadius = 80;
+        
+        canvasCtx.shadowColor = 'rgba(0, 255, 255, 0.8)';
+        canvasCtx.shadowBlur = 20;
+        canvasCtx.strokeStyle = 'rgba(150, 255, 255, 0.9)';
+        canvasCtx.lineWidth = 6;
+        
+        canvasCtx.beginPath();
+        canvasCtx.arc(leftX, leftY, bowRadius, angle - Math.PI/2.5, angle + Math.PI/2.5);
+        canvasCtx.stroke();
+        
+        const topX = leftX + Math.cos(angle - Math.PI/2.5) * bowRadius;
+        const topY = leftY + Math.sin(angle - Math.PI/2.5) * bowRadius;
+        const botX = leftX + Math.cos(angle + Math.PI/2.5) * bowRadius;
+        const botY = leftY + Math.sin(angle + Math.PI/2.5) * bowRadius;
+        
+        canvasCtx.lineWidth = 2;
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(topX, topY);
+        canvasCtx.lineTo(rightX, rightY);
+        canvasCtx.lineTo(botX, botY);
+        canvasCtx.stroke();
+        
+        canvasCtx.shadowColor = 'rgba(255, 200, 0, 0.9)';
+        canvasCtx.strokeStyle = 'rgba(255, 255, 150, 1)';
+        canvasCtx.lineWidth = 5;
+        
+        const arrowLen = dist + 50;
+        const arrowTipX = rightX - Math.cos(angle) * arrowLen;
+        const arrowTipY = rightY - Math.sin(angle) * arrowLen;
+        
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(rightX, rightY);
+        canvasCtx.lineTo(arrowTipX, arrowTipY);
+        canvasCtx.stroke();
+        
+        canvasCtx.fillStyle = 'rgba(255, 255, 150, 1)';
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(arrowTipX, arrowTipY);
+        canvasCtx.lineTo(arrowTipX + Math.cos(angle - 0.5) * 20, arrowTipY + Math.sin(angle - 0.5) * 20);
+        canvasCtx.lineTo(arrowTipX + Math.cos(angle + 0.5) * 20, arrowTipY + Math.sin(angle + 0.5) * 20);
+        canvasCtx.closePath();
+        canvasCtx.fill();
+        
+        canvasCtx.shadowBlur = 0;
+      }
       
-      canvasCtx.beginPath();
-      canvasCtx.moveTo(x2, y2);
-      canvasCtx.lineTo(midX, midY);
-      canvasCtx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
-      canvasCtx.lineWidth = 5;
-      canvasCtx.stroke();
-      
-      canvasCtx.beginPath();
-      canvasCtx.arc(x2, y2, 12, 0, 2 * Math.PI);
-      canvasCtx.fillStyle = 'rgba(0, 100, 255, 1)';
-      canvasCtx.fill();
-      
-      const gradient = canvasCtx.createRadialGradient(midX, midY, orbRadius * 0.1, midX, midY, orbRadius);
-      gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-      gradient.addColorStop(0.2, 'rgba(148, 0, 211, 0.9)');
-      gradient.addColorStop(1, 'rgba(148, 0, 211, 0)');
-      
-      canvasCtx.beginPath();
-      canvasCtx.arc(midX, midY, orbRadius, 0, 2 * Math.PI);
-      canvasCtx.fillStyle = gradient;
-      canvasCtx.fill();
+      canvasCtx.globalCompositeOperation = 'source-over';
     }
     
     if (showSkeleton) {
       for (const landmarks of results.multiHandLandmarks) {
         window.drawConnectors(canvasCtx, landmarks, window.HAND_CONNECTIONS, {
-          color: 'rgba(0, 255, 128, 0.6)',
-          lineWidth: 3
+          color: 'rgba(0, 255, 128, 0.4)',
+          lineWidth: 2
         });
         window.drawLandmarks(canvasCtx, landmarks, {
-          color: 'rgba(255, 50, 50, 0.8)',
+          color: 'rgba(255, 50, 50, 0.6)',
           lineWidth: 1,
-          radius: 3
+          radius: 2
         });
       }
     }
