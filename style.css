@@ -34,8 +34,30 @@ video, canvas {
   left: 50%;
   transform: translate(-50%, -50%);
   background: rgba(0, 0, 0, 0.8);
-  padding: 12px 24px;
+  padding: 20px;
   border-radius: 8px;
   z-index: 10;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+button {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: bold;
+  color: white;
+  background-color: #007bff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button:active {
+  background-color: #0056b3;
+}
+
+p {
+  margin: 0;
 }
